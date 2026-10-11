@@ -106,7 +106,7 @@ def set_temp_path(conn: Connection, photo_id: int, path: str) -> None:
 
 def get_active_for_session(conn: Connection, user_id: int, d: date, session: str) -> dict | None:
     return conn.execute(
-        "SELECT id, resubmit_allowed FROM attendance_records "
+        "SELECT id, resubmit_allowed, final_status, flags FROM attendance_records "
         "WHERE user_id = %s AND attendance_date = %s AND session = %s AND superseded_at IS NULL",
         (user_id, d, session),
     ).fetchone()

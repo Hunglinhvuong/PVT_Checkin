@@ -104,14 +104,15 @@ def test_late_photo_is_marked_late_with_deadline_in_message(monkeypatch, tmp_pat
     assert "07:50" in message_for(comp.verification_status, comp.final_status, comp.reason, comp.deadline)
 
 
-def test_edited_photo_rejected_and_cannot_be_replaced(tmp_path):
+def test_edited_photo_rejected_and_can_be_replaced(tmp_path):
     day = _workday()
     res, f, at = _send(tmp_path, day, 7, 20)
     out = VerificationOutcome("VERIFIED_FAKE", status_text="unable to verify", status_code=-2300, reason="EDITED")
     _, comp = _verify(res, out, tmp_path)
-    assert comp.final_status == "REJECTED" and "chỉnh sửa" in message_for(comp.verification_status, comp.final_status, comp.reason)
+    assert comp.final_status == "REJECTED" and comp.resubmit_allowed
+    assert "chỉnh sửa" in message_for(comp.verification_status, comp.final_status, comp.reason)
     again, _, _ = _send(tmp_path, day, 7, 40)
-    assert again.kind == "DUPLICATE"  # ảnh bị chỉnh sửa không được thay bằng ảnh khác
+    assert again.kind == "OK" and again.superseded_id == res.record["id"]
 
 
 def test_no_code_then_resend_succeeds_keeping_history(tmp_path):
@@ -119,7 +120,9 @@ def test_no_code_then_resend_succeeds_keeping_history(tmp_path):
     first, _, at1 = _send(tmp_path, day, 7, 10)
     out = VerificationOutcome("UNABLE_TO_VERIFY", status_text="unable to verify", status_code=-2301, reason="NO_VALID_CODE")
     _, comp = _verify(first, out, tmp_path)
-    assert message_for(comp.verification_status, comp.final_status, comp.reason, None, comp.resubmit_allowed) == "❌ Ảnh không có code hợp lệ, cần gửi ảnh khác."
+    assert "Ảnh không có code hợp lệ" in message_for(
+        comp.verification_status, comp.final_status, comp.reason, None, comp.resubmit_allowed
+    )
 
     second, _, at2 = _send(tmp_path, day, 7, 25)
     assert second.kind == "OK" and second.superseded_id == first.record["id"]

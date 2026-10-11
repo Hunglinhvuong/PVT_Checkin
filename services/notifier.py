@@ -36,13 +36,18 @@ def message_for(
     verification_status: str, final_status: str | None, reason: str | None = None, deadline=None,
     resubmit_allowed: bool = True, capture_date=None, expected_date=None,
 ) -> str:
+    resend = (
+        " Vui lòng chụp lại bằng Timemark và gửi ảnh khác."
+        if resubmit_allowed
+        else " Bạn đã hết số lần gửi ảnh trong buổi này, vui lòng liên hệ admin."
+    )
     if reason == "DATE_MISMATCH":  # ảnh đã được Timemark xác minh nhưng ngày chụp không khớp ngày điểm danh
         cd = f"{capture_date:%d/%m/%Y}" if capture_date else "?"
         ed = f"{expected_date:%d/%m/%Y}" if expected_date else "?"
         base = f"❌ Ảnh đã xác minh nhưng ngày chụp ({cd}) không phải ngày điểm danh ({ed})."
-        if resubmit_allowed:
-            return base + " Vui lòng chụp lại bằng Timemark và gửi lại."
-        return base + " Bạn đã hết số lần gửi lại trong buổi này, vui lòng liên hệ admin."
+        return base + resend
+    if reason == "SESSION_MISMATCH":
+        return "❌ Ảnh đã xác minh nhưng buổi chụp không khớp buổi điểm danh." + resend
     if verification_status == "VERIFIED_AUTHENTIC" and final_status == "VALID":
         return "✅ Điểm danh hợp lệ (đúng giờ)."
     if verification_status == "VERIFIED_AUTHENTIC" and final_status == "LATE":
@@ -51,12 +56,12 @@ def message_for(
         return "✅ Ảnh đã được Timemark xác minh."
     if verification_status == "VERIFIED_FAKE":
         if reason == "EDITED":
-            return "❌ Ảnh đã bị chỉnh sửa (Timemark không xác nhận), không được chấp nhận."
-        return "❌ Ảnh không vượt qua xác minh Timemark."
+            return "❌ Ảnh đã bị chỉnh sửa (Timemark không xác nhận), không được chấp nhận." + resend
+        return "❌ Ảnh không vượt qua xác minh Timemark." + resend
     if verification_status == "UNABLE_TO_VERIFY" and reason == "NO_VALID_CODE":
-        if resubmit_allowed:
-            return "❌ Ảnh không có code hợp lệ, cần gửi ảnh khác."
-        return "❌ Ảnh không có code hợp lệ và bạn đã hết số lần gửi lại trong buổi này. Vui lòng liên hệ admin."
+        return "❌ Ảnh không có code hợp lệ." + resend
+    if final_status == "REJECTED":
+        return "❌ Ảnh bị từ chối." + resend
     if verification_status == "UNABLE_TO_VERIFY" and reason == "PENDING_UPLOAD":
         return "⚠️ Timemark vẫn chưa nhận được dữ liệu ảnh sau nhiều lần thử. Admin sẽ kiểm tra."
     return "⚠️ Ảnh cần admin kiểm tra."

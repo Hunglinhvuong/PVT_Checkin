@@ -8,7 +8,7 @@ from database.connection import get_conn
 from repositories import attendance, audit, holidays, users
 from services.workcalendar import is_working_day, session_for, to_local
 
-# 1 lần gửi + tối đa 2 lần gửi lại (chỉ khi ảnh trước bị từ chối vì không có code hợp lệ, Timemark Status -2301)
+# Tối đa 3 ảnh gửi trong mỗi buổi, gồm cả ảnh đầu tiên.
 MAX_ATTEMPTS_PER_SESSION = 3
 
 
@@ -34,7 +34,7 @@ class Eligibility:
     work_date: date | None = None
     session: str | None = None
     holiday_name: str | None = None
-    supersedes: int | None = None  # id bản ghi bị từ chối (-2301) sẽ được thay thế bởi ảnh gửi lại
+    supersedes: int | None = None  # id bản ghi được phép thay thế bằng ảnh gửi lại
 
 
 @dataclass(frozen=True)
@@ -68,7 +68,12 @@ def _check(conn, telegram_user_id: int, received_at: datetime, tz: str) -> Eligi
     active = attendance.get_active_for_session(conn, user["id"], d, session)
     if active is None:
         return Eligibility("OK", user, d, session)
-    if active["resubmit_allowed"]:
+    retryable_mismatch = {"CAPTURE_DATE_MISMATCH", "CAPTURE_SESSION_MISMATCH"}
+    if (
+        active["resubmit_allowed"]
+        or active["final_status"] == "REJECTED"
+        or retryable_mismatch.intersection(active["flags"])
+    ):
         if attendance.count_attempts(conn, user["id"], d, session) >= MAX_ATTEMPTS_PER_SESSION:
             return Eligibility("ATTEMPTS_EXCEEDED", user, d, session)
         return Eligibility("OK", user, d, session, supersedes=active["id"])
@@ -115,7 +120,8 @@ def record_intake(intake: PhotoIntake, tz: str) -> IntakeResult:
                     audit.add(
                         conn, action="ATTENDANCE_SUPERSEDED", entity_type="attendance_records", entity_id=el.supersedes,
                         actor_telegram_id=intake.telegram_user_id, actor_type="USER",
-                        new_value={"superseded_by": record["id"]}, reason="Gửi lại ảnh sau khi ảnh trước không có code hợp lệ",
+                        new_value={"superseded_by": record["id"]},
+                        reason="Gửi ảnh thay thế sau khi ảnh trước bị từ chối hoặc sai ngày/buổi",
                     )
 
                 flagged = attendance.find_other_with_hash(conn, intake.sha256, record["id"]) is not None

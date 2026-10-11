@@ -55,8 +55,8 @@ python main.py worker                     # chạy worker (tiến trình riêng 
 |---|---|---|
 | Authentic | ảnh hợp lệ | `VERIFIED_AUTHENTIC` |
 | Unable to verify + `Status: -2307` | Timemark chưa nhận dữ liệu ảnh | thử lại mỗi 10 phút, tối đa 5 lần (không tính vào lượt lỗi), hết lượt → `PENDING_REVIEW` |
-| Unable to verify + `Status: -2300` | ảnh đã bị chỉnh sửa | `VERIFIED_FAKE` → `REJECTED`, báo "ảnh bị chỉnh sửa" |
-| Unable to verify + `Status: -2301` | ảnh không có code hợp lệ | `REJECTED`, báo "Ảnh không có code hợp lệ, cần gửi ảnh khác"; nhân viên được gửi lại (tối đa 3 lần/buổi), ảnh cũ giữ làm lịch sử và bị đánh dấu thay thế |
+| Unable to verify + `Status: -2300` | ảnh đã bị chỉnh sửa | `VERIFIED_FAKE` → `REJECTED`, báo lý do và cho gửi ảnh thay thế nếu chưa quá giới hạn |
+| Unable to verify + `Status: -2301` | ảnh không có code hợp lệ | `REJECTED`, báo lý do và cho gửi ảnh thay thế nếu chưa quá giới hạn |
 | Unable to verify + mã khác | chưa rõ | `UNABLE_TO_VERIFY` → `PENDING_REVIEW` (admin xử lý) |
 Đổi số lần/khoảng chờ ở `PENDING_UPLOAD_MAX_RETRIES` / `PENDING_UPLOAD_RETRY_MINUTES` (services/verification.py).
 
@@ -94,9 +94,11 @@ python main.py dashboard          # mặc định 0.0.0.0:8501 (DASHBOARD_HOST /
   (loại `authenticated`). Đổi thư mục chỉ ảnh upload sau đó theo thư mục mới; ảnh cũ giữ nguyên `public_id` đã lưu trong DB.
   `CLOUDINARY_SET_ASSET_FOLDER=true` (mặc định) đặt thêm `asset_folder` để ảnh hiện trong thư mục ở Media Library; nếu tài khoản
   Cloudinary ở chế độ "fixed folder" và upload báo lỗi `asset_folder` thì đặt `false`.
-- **Ảnh xác minh Authentic nhưng ngày chụp ≠ ngày điểm danh** (`CAPTURE_DATE_MISMATCH`): bot báo cả hai ngày và yêu cầu chụp lại bằng
-  Timemark rồi gửi lại. Bản ghi để `PENDING_REVIEW` (admin vẫn `/resolve` được, vd khi đồng hồ điện thoại sai); nếu nhân viên gửi lại
-  thì ảnh cũ được đánh dấu "bị thay thế" và chuyển `REJECTED`, lịch sử giữ nguyên. Dùng chung giới hạn 3 lần gửi/buổi với Status -2301.
+- **Ảnh xác minh Authentic nhưng sai ngày** (`CAPTURE_DATE_MISMATCH`): bot báo cả hai ngày và yêu cầu chụp lại bằng Timemark rồi gửi lại.
+  **Sai buổi chụp** (`CAPTURE_SESSION_MISMATCH`) cũng cho phép gửi ảnh khác. Bản ghi để `PENDING_REVIEW` (admin vẫn `/resolve` được,
+  vd khi đồng hồ điện thoại sai); nếu nhân viên gửi lại thì ảnh cũ được đánh dấu "bị thay thế" và chuyển `REJECTED`, lịch sử giữ nguyên.
+- Mọi ảnh có trạng thái `REJECTED`, kể cả ảnh admin chủ động từ chối, có thể được thay thế. Giới hạn là 3 ảnh tổng cộng/buổi (kể cả ảnh
+  đầu tiên); khi thay thế, ảnh cũ được giữ làm lịch sử và đánh dấu bị thay thế.
 
 ## Giai đoạn 7 — Triển khai, sao lưu, vận hành
 Xem **docs/VAN_HANH.md**. Tóm tắt (Debian/Ubuntu, dịch vụ chạy trực tiếp từ thư mục dự án):

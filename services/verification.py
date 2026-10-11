@@ -41,7 +41,7 @@ class Completion:
     first_retry: bool = False  # lần đầu phải chờ Timemark nhận dữ liệu (để báo cho nhân viên một lần)
     deadline: time | None = None  # hạn điểm danh đã áp dụng (nếu đã đánh giá)
     punctuality: str | None = None
-    resubmit_allowed: bool = False  # nhân viên được/còn lượt gửi lại ảnh (không có code hợp lệ, hoặc sai ngày chụp)
+    resubmit_allowed: bool = False  # nhân viên được/còn lượt gửi lại ảnh bị từ chối hoặc sai ngày/buổi
     capture_date: date | None = None  # chỉ có khi reason == DATE_MISMATCH: ngày chụp đọc được từ ảnh
     expected_date: date | None = None  # ngày điểm danh (theo thời điểm nhận ảnh)
 
@@ -145,8 +145,9 @@ def complete(job: ClaimedJob, outcome: VerificationOutcome, tz: str = "Asia/Ho_C
             flags = [f for f in flags if f not in punctuality.EVAL_FLAGS]
             flags += [f for f in ev.flags if f not in flags]
             wanted = "PENDING_REVIEW" if flags else ev.final_status
-            if "CAPTURE_DATE_MISMATCH" in ev.flags:  # đã xác minh Authentic nhưng ngày chụp sai: yêu cầu gửi lại
-                date_mismatch = True
+            mismatch_flags = {"CAPTURE_DATE_MISMATCH", "CAPTURE_SESSION_MISMATCH"}
+            if mismatch_flags.intersection(ev.flags):
+                date_mismatch = "CAPTURE_DATE_MISMATCH" in ev.flags
                 resubmit = att_repo.count_attempts(
                     conn, record["user_id"], record["attendance_date"], record["session"]
                 ) < MAX_ATTEMPTS_PER_SESSION
@@ -154,11 +155,13 @@ def complete(job: ClaimedJob, outcome: VerificationOutcome, tz: str = "Asia/Ho_C
             wanted = "REJECTED"
         elif outcome.status == "UNABLE_TO_VERIFY" and outcome.reason == "NO_VALID_CODE":  # Status -2301
             wanted = "REJECTED"  # không có code hợp lệ: nhân viên cần gửi ảnh khác
+        else:  # NOT_FOUND, UNABLE_TO_VERIFY (mã lạ/hết lượt chờ), AUTOMATION_ERROR hết lượt, MANUAL_REVIEW
+            wanted = "PENDING_REVIEW"
+
+        if wanted == "REJECTED":
             resubmit = att_repo.count_attempts(
                 conn, record["user_id"], record["attendance_date"], record["session"]
             ) < MAX_ATTEMPTS_PER_SESSION
-        else:  # NOT_FOUND, UNABLE_TO_VERIFY (mã lạ/hết lượt chờ), AUTOMATION_ERROR hết lượt, MANUAL_REVIEW
-            wanted = "PENDING_REVIEW"
 
         # Không đè quyết định đã chốt (VALID/LATE/REJECTED do admin hoặc lần xử lý trước)
         can_override = record["final_status"] in ("RECEIVED", "PENDING_REVIEW")
@@ -193,7 +196,10 @@ def complete(job: ClaimedJob, outcome: VerificationOutcome, tz: str = "Asia/Ho_C
             },
         )
         return Completion(
-            "FINAL", outcome.status, final, "DATE_MISMATCH" if date_mismatch else outcome.reason,
+            "FINAL", outcome.status, final,
+            "DATE_MISMATCH" if date_mismatch else (
+                "SESSION_MISMATCH" if ev and "CAPTURE_SESSION_MISMATCH" in ev.flags else outcome.reason
+            ),
             deadline=ev.deadline if ev else None, punctuality=ev.punctuality if ev else None,
             resubmit_allowed=bool(resubmit and can_override),
             capture_date=to_local(outcome.capture_time, tz).date() if (date_mismatch and outcome.capture_time) else None,

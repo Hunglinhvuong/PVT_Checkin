@@ -188,12 +188,12 @@ def test_attempts_are_capped_at_three_per_session():
     assert att.record_intake(_intake(2, tue, sha="f" * 63 + "0"), TZ).kind == "ATTEMPTS_EXCEEDED"
 
 
-def test_other_rejections_are_not_resubmittable():
+def test_edited_photo_can_be_resubmitted():
     wed = datetime(2026, 10, 28, 0, 30, tzinfo=timezone.utc)
     res = att.record_intake(_intake(1, wed, sha="7" * 64), TZ)
     with get_conn() as conn:
         conn.execute("UPDATE attendance_records SET verification_status = 'VERIFIED_FAKE', final_status = 'REJECTED' WHERE id = %s", (res.record["id"],))
-    assert att.record_intake(_intake(1, wed, sha="8" * 64), TZ).kind == "DUPLICATE"  # ảnh bị chỉnh sửa: không cho thay
+    assert att.record_intake(_intake(1, wed, sha="8" * 64), TZ).kind == "OK"
 
 
 def test_concurrent_resubmissions_only_one_wins():
@@ -222,6 +222,17 @@ def test_date_mismatch_record_is_superseded_and_old_becomes_rejected():
         old = conn.execute("SELECT final_status, superseded_by, flags FROM attendance_records WHERE id = %s", (first.record["id"],)).fetchone()
     assert old["final_status"] == "REJECTED" and old["superseded_by"] == second.record["id"]
     assert old["flags"] == ["CAPTURE_DATE_MISMATCH"]  # lịch sử/cờ giữ nguyên
+
+
+def test_wrong_session_record_can_be_replaced():
+    mon = datetime(2026, 11, 2, 0, 30, tzinfo=timezone.utc)
+    first = att.record_intake(_intake(2, mon, sha="a" * 64), TZ)
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE attendance_records SET final_status = 'PENDING_REVIEW', flags = ARRAY['CAPTURE_SESSION_MISMATCH'] "
+            "WHERE id = %s", (first.record["id"],))
+    second = att.record_intake(_intake(2, mon, sha="b" * 64), TZ)
+    assert second.kind == "OK" and second.superseded_id == first.record["id"]
 
 
 # ------------------------------------------------------------------ Giai đoạn 7: tải đồng thời & lỗi Cloudinary

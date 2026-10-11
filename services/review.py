@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from database.connection import get_conn
-from repositories import admins, audit
+from repositories import admins, audit, attendance
+from services.attendance import MAX_ATTEMPTS_PER_SESSION
 
 DECISIONS = {"VALID": "ON_TIME", "LATE": "LATE", "REJECTED": None}  # decision -> punctuality_status (None: giữ nguyên)
 
@@ -42,10 +43,15 @@ def resolve(admin_telegram_id: int, record_id: int, decision: str, reason: str) 
         if rec["final_status"] != "PENDING_REVIEW":
             return "NOT_PENDING"
         punct = DECISIONS[decision] or rec["punctuality_status"]
+        resubmit = (
+            decision == "REJECTED"
+            and attendance.count_attempts(conn, rec["user_id"], rec["attendance_date"], rec["session"])
+            < MAX_ATTEMPTS_PER_SESSION
+        )
         conn.execute(
-            "UPDATE attendance_records SET final_status = %s, punctuality_status = %s, resubmit_allowed = FALSE, "
+            "UPDATE attendance_records SET final_status = %s, punctuality_status = %s, resubmit_allowed = %s, "
             "processed_at = now() WHERE id = %s",
-            (decision, punct, record_id),
+            (decision, punct, resubmit, record_id),
         )
         conn.execute(
             "INSERT INTO verification_logs (attendance_record_id, provider, status, result_text, finished_at, "
@@ -56,7 +62,8 @@ def resolve(admin_telegram_id: int, record_id: int, decision: str, reason: str) 
             conn, action="ATTENDANCE_MANUAL_RESOLVE", entity_type="attendance_records", entity_id=record_id,
             actor_telegram_id=admin_telegram_id, actor_type="ADMIN",
             old_value={"final_status": rec["final_status"], "punctuality_status": rec["punctuality_status"]},
-            new_value={"final_status": decision, "punctuality_status": punct}, reason=reason,
+            new_value={"final_status": decision, "punctuality_status": punct, "resubmit_allowed": resubmit},
+            reason=reason,
         )
         return "OK"
 

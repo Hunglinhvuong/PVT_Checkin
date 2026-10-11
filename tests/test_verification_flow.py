@@ -269,6 +269,7 @@ def test_edited_photo_is_rejected_with_reason():
     r = _rec(rid)
     assert (comp.kind, comp.reason) == ("FINAL", "EDITED")
     assert (r["verification_status"], r["final_status"], r["photo_taken_at"]) == ("VERIFIED_FAKE", "REJECTED", None)
+    assert r["resubmit_allowed"] is True
     with get_conn() as conn:
         lg = conn.execute("SELECT parsed FROM verification_logs WHERE attendance_record_id = %s ORDER BY id DESC LIMIT 1", (rid,)).fetchone()
     assert lg["parsed"]["status_code"] == -2300 and lg["parsed"]["reason"] == "EDITED"
@@ -351,6 +352,17 @@ def test_capture_from_previous_day_goes_to_manual_review():
     assert r["punctuality_status"] == "MANUAL_REVIEW"
 
 
+def test_capture_from_wrong_session_allows_resubmission():
+    rid = _mk()
+    with get_conn() as conn:
+        conn.execute("UPDATE attendance_records SET photo_received_at = %s WHERE id = %s", (_cap(13, 5), rid))
+    comp = _complete_authentic(capture_time=_cap(13, 0))
+    r = _rec(rid)
+    assert comp.reason == "SESSION_MISMATCH" and comp.resubmit_allowed
+    assert r["flags"] == ["CAPTURE_SESSION_MISMATCH"] and r["final_status"] == "PENDING_REVIEW"
+    assert r["resubmit_allowed"] is True
+
+
 def test_reverify_recomputes_evaluation_flags():
     rid = _mk()
     _complete_authentic(capture_time=None)
@@ -365,6 +377,7 @@ def test_admin_decision_not_overridden_by_evaluation():
     rid = _mk()
     verification.complete(verification.claim_next("w"), VerificationOutcome("VERIFIED_NOT_FOUND", status_text="not found"))
     assert review.resolve(ADMIN, rid, "REJECTED", "ảnh không phải Timemark") == "OK"
+    assert _rec(rid)["resubmit_allowed"] is True
     with get_conn() as conn:
         conn.execute("INSERT INTO verification_jobs (attendance_record_id) VALUES (%s)", (rid,))
     _complete_authentic()
@@ -428,3 +441,17 @@ def test_date_mismatch_resubmission_capped_and_admin_resolve_closes_it():
     assert _rec(rid2)["resubmit_allowed"] is True
     assert review.resolve(ADMIN, rid2, "VALID", "đồng hồ điện thoại bị lệch, đã xác nhận") == "OK"
     assert _rec(rid2)["resubmit_allowed"] is False  # admin đã chốt: không còn gửi lại để thay thế
+
+
+def test_admin_rejection_disables_resubmission_at_three_total_attempts():
+    rid = _mk()
+    with get_conn() as conn:
+        rec = conn.execute("SELECT user_id, attendance_date FROM attendance_records WHERE id = %s", (rid,)).fetchone()
+        for i in range(2):
+            conn.execute(
+                "INSERT INTO attendance_records (user_id, attendance_date, session, telegram_chat_id, telegram_message_id, "
+                "photo_id, photo_received_at, superseded_at, final_status) VALUES (%s, %s, 'MORNING', -1, %s, 'x', now(), now(), 'REJECTED')",
+                (rec["user_id"], rec["attendance_date"], 700000 + rid * 10 + i))
+    verification.complete(verification.claim_next("w"), VerificationOutcome("VERIFIED_NOT_FOUND", status_text="not found"))
+    assert review.resolve(ADMIN, rid, "REJECTED", "không xác minh được") == "OK"
+    assert _rec(rid)["resubmit_allowed"] is False

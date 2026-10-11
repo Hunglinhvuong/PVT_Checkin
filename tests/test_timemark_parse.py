@@ -139,7 +139,7 @@ def test_status_2301_no_valid_code_synthetic():
 
 
 def test_notifier_no_valid_code_message():
-    assert message_for("UNABLE_TO_VERIFY", "REJECTED", "NO_VALID_CODE") == "❌ Ảnh không có code hợp lệ, cần gửi ảnh khác."
+    assert message_for("UNABLE_TO_VERIFY", "REJECTED", "NO_VALID_CODE") == "❌ Ảnh không có code hợp lệ. Vui lòng chụp lại bằng Timemark và gửi ảnh khác."
     out = message_for("UNABLE_TO_VERIFY", "REJECTED", "NO_VALID_CODE", None, False)
     assert "hết số lần" in out and "cần gửi ảnh khác" not in out
 
@@ -151,3 +151,9 @@ def test_notifier_date_mismatch_messages():
     assert "09/10/2026" in msg and "12/10/2026" in msg and "gửi lại" in msg and "hết số lần" not in msg
     out = message_for("VERIFIED_AUTHENTIC", "PENDING_REVIEW", "DATE_MISMATCH", None, False, date(2026, 10, 9), date(2026, 10, 12))
     assert "hết số lần" in out and "Vui lòng chụp lại" not in out
+
+
+def test_notifier_session_mismatch_and_rejected_image_messages():
+    assert "buổi chụp không khớp" in message_for("VERIFIED_AUTHENTIC", "PENDING_REVIEW", "SESSION_MISMATCH")
+    assert "gửi ảnh khác" in message_for("VERIFIED_FAKE", "REJECTED", "EDITED")
+    assert "hết số lần" in message_for("VERIFIED_FAKE", "REJECTED", "EDITED", resubmit_allowed=False)
