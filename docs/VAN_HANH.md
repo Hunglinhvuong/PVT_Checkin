@@ -51,7 +51,7 @@ Không có `TEST_DATABASE_URL` thì các test tích hợp bị bỏ qua; `tests/
 ## 7. Xử lý sự cố
 | Triệu chứng | Nguyên nhân thường gặp → xử lý |
 |---|---|
-| Bot không trả lời | `journalctl -u telegram-attendance-bot`; sai `BOT_TOKEN`; 2 bản bot cùng chạy (lỗi 409 Conflict) → tắt bản thừa |
+| Bot không trả lời / log `telegram.error.TimedOut` khi khởi động | `journalctl -u telegram-attendance-bot`; kiểm tra `BOT_TOKEN`; nếu máy cần proxy, đặt `TELEGRAM_PROXY=http://127.0.0.1:<cổng-proxy>` trong `.env` rồi `sudo systemctl restart telegram-attendance-bot`; xác nhận proxy cho phép HTTPS tới `api.telegram.org`. Bot sẽ retry liên tục khi Telegram/proxy tạm thời mất kết nối; 2 bản bot cùng chạy (lỗi 409 Conflict) → tắt bản thừa |
 | Ảnh kẹt "đang chờ xác minh" | worker không chạy (`systemctl status ...-worker`); Chromium lỗi → `doctor`; Timemark chặn → worker tạm dừng 30 phút, ảnh chuyển `MANUAL_REVIEW` |
 | Worker báo sandbox/Chromium | Ubuntu 24.04+: đặt `TIMEMARK_NO_SANDBOX=true`; thiếu thư viện: `sudo .venv/bin/playwright install-deps chromium` |
 | Trang Timemark đổi giao diện | log `UI_CHANGED`, ảnh chụp ở `screenshots/`; chạy `python -m scripts.probe_timemark ảnh.jpg --headed` để lấy dữ liệu và cập nhật bộ phân tích |

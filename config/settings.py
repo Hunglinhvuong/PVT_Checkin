@@ -79,6 +79,7 @@ class Settings:
     db_pool_min: int
     db_pool_max: int
     bot_token: str
+    telegram_proxy: str
     admin_telegram_ids: tuple[int, ...]
     attendance_chat_ids: tuple[int, ...]
     cloudinary_cloud_name: str
@@ -120,6 +121,7 @@ def load_settings(env_file: str | os.PathLike | None = None) -> Settings:
         db_pool_min=_int("DB_POOL_MIN", 1),
         db_pool_max=_int("DB_POOL_MAX", 10),
         bot_token=os.getenv("BOT_TOKEN", "").strip(),
+        telegram_proxy=os.getenv("TELEGRAM_PROXY", "").strip(),
         admin_telegram_ids=_int_list("ADMIN_TELEGRAM_IDS"),
         attendance_chat_ids=_int_list("ATTENDANCE_CHAT_IDS"),
         cloudinary_cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME", "").strip(),

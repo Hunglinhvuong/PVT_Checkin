@@ -1,4 +1,8 @@
-from ops.doctor import FAIL, OK, WARN, Check, alert_text, decide_alert, evaluate_backup_age, fingerprint, format_report
+from config.settings import load_settings
+from ops.doctor import (
+    FAIL, OK, WARN, Check, alert_text, check_telegram, decide_alert, evaluate_backup_age,
+    fingerprint, format_report,
+)
 
 H = 3600
 
@@ -40,3 +44,18 @@ def test_texts():
     t = alert_text(checks)
     assert "PostgreSQL" in t and "Đĩa" not in t  # chỉ liệt kê mục có vấn đề
     assert "bình thường trở lại" in alert_text([Check("A", OK)])
+
+
+def test_telegram_check_uses_configured_proxy(monkeypatch, tmp_path):
+    monkeypatch.setenv("BOT_TOKEN", "test-token")
+    monkeypatch.setenv("TELEGRAM_PROXY", "http://proxy.example:8080")
+    settings = load_settings(tmp_path / "none.env")
+    calls = []
+    monkeypatch.setattr(
+        "ops.doctor._http",
+        lambda url, proxy_url=None: calls.append((url, proxy_url))
+        or b'{"ok":true,"result":{"username":"test"}}',
+    )
+
+    assert check_telegram(settings).level == OK
+    assert calls == [("https://api.telegram.org/bottest-token/getMe", "http://proxy.example:8080")]

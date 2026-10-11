@@ -4,7 +4,7 @@ from config.settings import ConfigError, load_settings
 
 
 def _clear(monkeypatch):
-    for k in ("DATABASE_URL", "ADMIN_TELEGRAM_IDS", "DB_POOL_MIN", "DB_POOL_MAX", "BOT_TOKEN"):
+    for k in ("DATABASE_URL", "ADMIN_TELEGRAM_IDS", "DB_POOL_MIN", "DB_POOL_MAX", "BOT_TOKEN", "TELEGRAM_PROXY"):
         monkeypatch.delenv(k, raising=False)
 
 
@@ -14,6 +14,12 @@ def test_defaults(monkeypatch, tmp_path):
     assert s.timezone == "Asia/Ho_Chi_Minh"
     assert s.admin_telegram_ids == ()
     assert s.db_pool_min == 1
+
+
+def test_telegram_proxy(monkeypatch, tmp_path):
+    _clear(monkeypatch)
+    monkeypatch.setenv("TELEGRAM_PROXY", "http://proxy.example:8080")
+    assert load_settings(tmp_path / "none.env").telegram_proxy == "http://proxy.example:8080"
 
 
 def test_admin_ids_parse(monkeypatch, tmp_path):

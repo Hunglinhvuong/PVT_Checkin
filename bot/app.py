@@ -38,14 +38,16 @@ def run_bot(settings: Settings) -> None:
     async def post_shutdown(app: Application) -> None:
         await asyncio.to_thread(close_pool)
 
-    app = (
+    builder = (
         Application.builder()
         .token(settings.bot_token)
         .concurrent_updates(8)
         .post_init(post_init)
         .post_shutdown(post_shutdown)
-        .build()
     )
+    if settings.telegram_proxy:
+        builder = builder.proxy(settings.telegram_proxy).get_updates_proxy(settings.telegram_proxy)
+    app = builder.build()
     app.bot_data["settings"] = settings
 
     app.add_handler(CommandHandler("start", h.cmd_start))
@@ -67,4 +69,4 @@ def run_bot(settings: Settings) -> None:
         log.warning("Thiếu job-queue: cài 'python-telegram-bot[job-queue]' để bật retry upload tự động")
 
     log.info("Bot khởi động (polling)")
-    app.run_polling(allowed_updates=[Update.MESSAGE, Update.CALLBACK_QUERY])
+    app.run_polling(allowed_updates=[Update.MESSAGE, Update.CALLBACK_QUERY], bootstrap_retries=-1)
