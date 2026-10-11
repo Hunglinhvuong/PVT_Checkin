@@ -9,7 +9,7 @@ log = logging.getLogger(__name__)
 
 PENDING_UPLOAD_NOTICE = (
     "⏳ Timemark chưa nhận được dữ liệu ảnh. Hãy mở ứng dụng Timemark để đồng bộ; "
-    "hệ thống sẽ tự thử lại mỗi 10 phút (tối đa 5 lần)."
+    "hệ thống sẽ tự thử lại mỗi 02 phút (tối đa 5 lần)."
 )
 
 
