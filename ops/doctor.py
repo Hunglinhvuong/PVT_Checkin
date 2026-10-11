@@ -84,10 +84,15 @@ def _safe(name: str, fn) -> list[Check]:
 
 
 def check_config(s: Settings) -> Check:
-    missing = [n for n, v in [
+    required = [
         ("DATABASE_URL", s.database_url), ("BOT_TOKEN", s.bot_token), ("ADMIN_TELEGRAM_IDS", s.admin_telegram_ids),
-        ("CLOUDINARY_CLOUD_NAME", s.cloudinary_cloud_name), ("CLOUDINARY_API_KEY", s.cloudinary_api_key),
-        ("CLOUDINARY_API_SECRET", s.cloudinary_api_secret)] if not v]
+    ]
+    if s.photo_storage_backend == "cloudinary":
+        required.extend([
+            ("CLOUDINARY_CLOUD_NAME", s.cloudinary_cloud_name), ("CLOUDINARY_API_KEY", s.cloudinary_api_key),
+            ("CLOUDINARY_API_SECRET", s.cloudinary_api_secret),
+        ])
+    missing = [name for name, value in required if not value]
     if missing:
         return Check("Cấu hình .env", FAIL, "thiếu " + ", ".join(missing))
     if not s.attendance_chat_ids:
@@ -122,7 +127,10 @@ def check_database(s: Settings) -> list[Check]:
         out.append(Check("Hàng đợi xác minh", WARN if (queued or running) else OK,
                          f"{queued} job chờ quá {q} phút, {running} job treo (worker có đang chạy?)" if (queued or running) else "bình thường"))
         out.append(Check("Job xác minh lỗi (24h)", WARN if failed else OK, f"{failed} job"))
-        up = conn.execute("SELECT count(*) FROM attendance_photos WHERE cloudinary_public_id IS NULL AND upload_attempts >= 5").fetchone()[0]
+        up = conn.execute(
+            "SELECT count(*) FROM attendance_photos WHERE storage_backend = 'cloudinary' "
+            "AND cloudinary_public_id IS NULL AND upload_attempts >= 5"
+        ).fetchone()[0]
         out.append(Check("Upload Cloudinary", WARN if up else OK, f"{up} ảnh upload lỗi quá 5 lần" if up else "không có ảnh kẹt"))
         pr = conn.execute("SELECT count(*) FROM attendance_records WHERE final_status = 'PENDING_REVIEW' AND superseded_at IS NULL").fetchone()[0]
         out.append(Check("Chờ admin kiểm tra", OK, f"{pr} bản ghi"))
@@ -218,7 +226,7 @@ def run_doctor(s: Settings, alert: bool = False, quick: bool = False) -> int:
     if not quick:
         if s.bot_token:
             checks += _safe("Telegram", lambda: check_telegram(s))
-        if s.cloudinary_cloud_name:
+        if s.photo_storage_backend == "cloudinary" and s.cloudinary_cloud_name:
             checks += _safe("Cloudinary", lambda: check_cloudinary(s))
         checks += _safe("Trang Timemark", lambda: check_timemark(s))
         checks += _safe("Chromium (Playwright)", lambda: check_playwright(s))

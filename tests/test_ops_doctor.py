@@ -1,6 +1,8 @@
+import dataclasses
+
 from config.settings import load_settings
 from ops.doctor import (
-    FAIL, OK, WARN, Check, alert_text, check_telegram, decide_alert, evaluate_backup_age,
+    FAIL, OK, WARN, Check, alert_text, check_config, check_telegram, decide_alert, evaluate_backup_age,
     fingerprint, format_report,
 )
 
@@ -44,6 +46,22 @@ def test_texts():
     t = alert_text(checks)
     assert "PostgreSQL" in t and "Đĩa" not in t  # chỉ liệt kê mục có vấn đề
     assert "bình thường trở lại" in alert_text([Check("A", OK)])
+
+
+def test_local_storage_does_not_require_cloudinary(monkeypatch, tmp_path):
+    monkeypatch.delenv("CLOUDINARY_CLOUD_NAME", raising=False)
+    monkeypatch.delenv("CLOUDINARY_API_KEY", raising=False)
+    monkeypatch.delenv("CLOUDINARY_API_SECRET", raising=False)
+    settings = dataclasses.replace(
+        load_settings(tmp_path / "none.env"),
+        database_url="postgresql://localhost/attendance",
+        bot_token="token",
+        admin_telegram_ids=(1,),
+        attendance_chat_ids=(-100,),
+        photo_storage_backend="local",
+    )
+
+    assert check_config(settings).level == OK
 
 
 def test_telegram_check_uses_configured_proxy(monkeypatch, tmp_path):

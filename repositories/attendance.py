@@ -66,9 +66,18 @@ def get_photo_for_upload(conn: Connection, photo_id: int) -> dict | None:
 
 def mark_uploaded(conn: Connection, photo_id: int, public_id: str, url: str) -> None:
     conn.execute(
-        "UPDATE attendance_photos SET cloudinary_public_id = %s, cloudinary_url = %s, uploaded_at = now(), "
+        "UPDATE attendance_photos SET storage_backend = 'cloudinary', cloudinary_public_id = %s, "
+        "cloudinary_url = %s, uploaded_at = now(), "
         "last_upload_error = NULL WHERE id = %s",
         (public_id, url, photo_id),
+    )
+
+
+def mark_saved_locally(conn: Connection, photo_id: int, path: str) -> None:
+    conn.execute(
+        "UPDATE attendance_photos SET storage_backend = 'local', temp_path = %s, uploaded_at = now(), "
+        "last_upload_error = NULL WHERE id = %s",
+        (path, photo_id),
     )
 
 
@@ -81,7 +90,8 @@ def mark_upload_failed(conn: Connection, photo_id: int, error: str) -> None:
 
 def list_pending_uploads(conn: Connection, limit: int, max_attempts: int) -> list[int]:
     rows = conn.execute(
-        "SELECT id FROM attendance_photos WHERE cloudinary_public_id IS NULL AND upload_attempts < %s "
+        "SELECT id FROM attendance_photos WHERE storage_backend = 'cloudinary' "
+        "AND cloudinary_public_id IS NULL AND upload_attempts < %s "
         "ORDER BY id LIMIT %s",
         (max_attempts, limit),
     ).fetchall()
@@ -98,6 +108,13 @@ def get_photo_with_status(conn: Connection, photo_id: int) -> dict | None:
 
 def clear_temp_path(conn: Connection, photo_id: int) -> None:
     conn.execute("UPDATE attendance_photos SET temp_path = NULL WHERE id = %s", (photo_id,))
+
+
+def clear_local_path(conn: Connection, path: str) -> None:
+    conn.execute(
+        "UPDATE attendance_photos SET temp_path = NULL WHERE temp_path = %s AND storage_backend = 'local'",
+        (path,),
+    )
 
 
 def set_temp_path(conn: Connection, photo_id: int, path: str) -> None:

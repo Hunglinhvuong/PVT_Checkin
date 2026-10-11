@@ -80,7 +80,7 @@ async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     temp_path = None
     try:
         temp_path = await asyncio.to_thread(
-            photo_storage.save_temp, settings.upload_tmp_dir, chat.id, msg.message_id, ext, data
+            photo_storage.save_temp, photo_storage.incoming_photo_dir(settings), chat.id, msg.message_id, ext, data
         )
         intake = attendance.PhotoIntake(
             telegram_user_id=u.id,

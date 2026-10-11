@@ -46,7 +46,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "seed":
             _seed(s)
         elif args.command == "bot":
-            s.require("bot_token", "cloudinary_cloud_name", "cloudinary_api_key", "cloudinary_api_secret")
+            s.require("bot_token")
+            if s.photo_storage_backend == "cloudinary":
+                s.require("cloudinary_cloud_name", "cloudinary_api_key", "cloudinary_api_secret")
             if not s.admin_telegram_ids:
                 raise ConfigError("ADMIN_TELEGRAM_IDS chưa được cấu hình (cần ít nhất một admin)")
             migrate(s.database_url)

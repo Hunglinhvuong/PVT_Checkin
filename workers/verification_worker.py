@@ -69,6 +69,7 @@ def run_worker(settings: Settings) -> int:
             signal.signal(sig, lambda *_: stop.set())
         worker_id = f"{socket.gethostname()}:{os.getpid()}"
         cooldown_until = 0.0
+        next_local_cleanup = 0.0
         log.info("Worker %s bắt đầu", worker_id)
 
         with TimemarkWebVerifier(
@@ -77,6 +78,16 @@ def run_worker(settings: Settings) -> int:
             no_sandbox=settings.timemark_no_sandbox,
         ) as verifier:
             while not stop.is_set():
+                if time.time() >= next_local_cleanup:
+                    try:
+                        photo_storage.cleanup_expired_local(
+                            settings.local_photo_dir, settings.local_photo_retention_days
+                        )
+                    except Exception:
+                        log.exception("Không dọn được ảnh local quá hạn")
+                        next_local_cleanup = time.time() + 3600
+                    else:
+                        next_local_cleanup = time.time() + 24 * 60 * 60
                 if time.time() < cooldown_until:
                     stop.wait(10)
                     continue

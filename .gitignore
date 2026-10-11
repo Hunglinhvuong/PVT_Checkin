@@ -4,7 +4,7 @@ __pycache__/
 .venv/
 logs/
 screenshots/
+local/photos/
 .pytest_cache/
 venv/
 probe_out/
-

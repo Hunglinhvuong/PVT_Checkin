@@ -24,7 +24,8 @@ def _image(d: dict) -> None:
         st.markdown(f"[Mở ảnh gốc]({url})")
     elif d["temp_path"] and os.path.exists(d["temp_path"]):
         st.image(d["temp_path"], use_container_width=True)
-        st.caption("Ảnh tạm trên máy chủ (chưa có trên Cloudinary).")
+        st.caption("Ảnh lưu trên máy chủ." if d["storage_backend"] == "local"
+                   else "Ảnh tạm trên máy chủ (chưa có trên Cloudinary).")
     else:
         st.warning("Không có ảnh để hiển thị (chưa upload Cloudinary hoặc chưa cấu hình xem ảnh).")
 
@@ -101,7 +102,9 @@ def render() -> None:
             "GPS (trang Timemark)": d["gps_raw"] or "—",
             "Thiết bị": d["device_model"] or "—",
             "SHA-256": d["sha256"] or "—",
-            "Upload Cloudinary": "Đã upload" if d["cloudinary_public_id"] else f"Chưa (lần thử {d['upload_attempts']}, {d['last_upload_error'] or '—'})",
+            "Lưu ảnh": ("Local" if d["storage_backend"] == "local" else
+                        "Cloudinary" if d["cloudinary_public_id"] else
+                        f"Chưa upload (lần thử {d['upload_attempts']}, {d['last_upload_error'] or '—'})"),
         }
         st.table(pd.Series(info, name="Giá trị"))
 

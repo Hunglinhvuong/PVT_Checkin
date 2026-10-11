@@ -87,6 +87,9 @@ class Settings:
     cloudinary_api_secret: str
     cloudinary_folder: str
     cloudinary_set_asset_folder: bool
+    photo_storage_backend: str
+    local_photo_dir: Path
+    local_photo_retention_days: int
     upload_tmp_dir: Path
     timemark_url: str
     timemark_headless: bool
@@ -129,6 +132,9 @@ def load_settings(env_file: str | os.PathLike | None = None) -> Settings:
         cloudinary_api_secret=os.getenv("CLOUDINARY_API_SECRET", "").strip(),
         cloudinary_folder=validate_folder(os.getenv("CLOUDINARY_FOLDER", "attendance")),
         cloudinary_set_asset_folder=_bool("CLOUDINARY_SET_ASSET_FOLDER", True),
+        photo_storage_backend=os.getenv("PHOTO_STORAGE_BACKEND", "cloudinary").strip().lower() or "cloudinary",
+        local_photo_dir=_path("LOCAL_PHOTO_DIR", "local/photos"),
+        local_photo_retention_days=_int("LOCAL_PHOTO_RETENTION_DAYS", 90),
         upload_tmp_dir=_path("UPLOAD_TMP_DIR", "tmp/photos"),
         timemark_url=os.getenv("TIMEMARK_URL", "https://verify.timemark.com/").strip(),
         timemark_headless=_bool("TIMEMARK_HEADLESS", True),
@@ -150,6 +156,10 @@ def load_settings(env_file: str | os.PathLike | None = None) -> Settings:
     )
     if s.db_pool_min < 1 or s.db_pool_max < s.db_pool_min:
         raise ConfigError("DB_POOL_MIN >= 1 và DB_POOL_MAX >= DB_POOL_MIN")
+    if s.photo_storage_backend not in {"cloudinary", "local"}:
+        raise ConfigError("PHOTO_STORAGE_BACKEND phải là cloudinary hoặc local")
+    if s.local_photo_retention_days < 1:
+        raise ConfigError("LOCAL_PHOTO_RETENTION_DAYS phải >= 1")
     if (s.office_latitude is None) != (s.office_longitude is None):
         raise ConfigError("OFFICE_LATITUDE và OFFICE_LONGITUDE phải đặt cùng nhau")
     if s.office_latitude is not None and not (-90 <= s.office_latitude <= 90 and -180 <= s.office_longitude <= 180):

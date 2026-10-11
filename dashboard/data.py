@@ -65,7 +65,8 @@ def overview(d: date, tz: str) -> dict:
         "jobs": {r["status"]: r["n"] for r in _read(
             "SELECT status, count(*) AS n FROM verification_jobs WHERE status IN ('QUEUED', 'RUNNING') GROUP BY status")},
         "pending_upload": _read(
-            "SELECT count(*) AS n FROM attendance_photos WHERE cloudinary_public_id IS NULL")[0]["n"],
+            "SELECT count(*) AS n FROM attendance_photos "
+            "WHERE storage_backend = 'cloudinary' AND cloudinary_public_id IS NULL")[0]["n"],
     }
 
 
@@ -118,7 +119,7 @@ def review_queue(limit: int = 300) -> list[dict]:
 _DETAIL_SQL = (
     "SELECT r.*, u.full_name, u.telegram_user_id, p.id AS pid, p.cloudinary_public_id, p.cloudinary_url, p.sha256, "
     "p.photo_code, p.latitude, p.longitude, p.gps_raw, p.device_model, p.temp_path, p.upload_attempts, "
-    "p.last_upload_error, p.file_ext, p.source "
+    "p.last_upload_error, p.file_ext, p.source, p.storage_backend "
     "FROM attendance_records r JOIN users u ON u.id = r.user_id "
     "LEFT JOIN attendance_photos p ON p.attendance_record_id = r.id WHERE r.id = %s"
 )
@@ -241,7 +242,8 @@ def anomalies() -> dict[str, list[dict]]:
             "OR (status = 'QUEUED' AND run_after < now() - interval '30 minutes') ORDER BY id DESC LIMIT 200"),
         "uploads": _read(
             "SELECT id, attendance_record_id, upload_attempts, last_upload_error FROM attendance_photos "
-            "WHERE cloudinary_public_id IS NULL AND upload_attempts > 0 ORDER BY id DESC LIMIT 200"),
+            "WHERE storage_backend = 'cloudinary' AND cloudinary_public_id IS NULL "
+            "AND upload_attempts > 0 ORDER BY id DESC LIMIT 200"),
         "duplicate_hashes": _read(
             "SELECT sha256, count(*) AS n, array_agg(attendance_record_id ORDER BY attendance_record_id) AS record_ids "
             "FROM attendance_photos GROUP BY sha256 HAVING count(*) > 1 ORDER BY max(id) DESC LIMIT 200"),
