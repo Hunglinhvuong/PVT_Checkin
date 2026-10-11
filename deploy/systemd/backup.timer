@@ -1,0 +1,11 @@
+[Unit]
+Description=Telegram Attendance - Sao lưu hằng ngày
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=300
+Persistent=true
+Unit=telegram-attendance-backup.service
+
+[Install]
+WantedBy=timers.target

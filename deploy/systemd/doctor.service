@@ -1,0 +1,11 @@
+[Unit]
+Description=Telegram Attendance - Kiểm tra sức khỏe và cảnh báo
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=@SERVICE_USER@
+WorkingDirectory=@PROJECT_DIR@
+Environment=LOG_TO_FILE=false
+ExecStart=@PROJECT_DIR@/.venv/bin/python main.py doctor --alert
+SuccessExitStatus=0 1

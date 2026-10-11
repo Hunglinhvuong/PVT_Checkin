@@ -1,0 +1,27 @@
+English
+verify-result
+
+Upload multiple photos to verify their authenticity, metadata, and location using our AI analysis.
+
+Click or drag images to upload
+
+Support multiple image selection. PNG, JPG, GIF up to 10MB
+
+Clear All
+N/A
+Unable to verify
+Waiting for upload verification
+Please open Timemark to upload and verify
+Status: -2307
+Location
+Unknown
+GPS
+No Data
+Device Model
+Unknown
+Software Provider
+Unknown
+Capture Time
+--
+Photo Code
+--

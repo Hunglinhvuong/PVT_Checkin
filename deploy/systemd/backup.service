@@ -1,0 +1,12 @@
+[Unit]
+Description=Telegram Attendance - Sao lưu PostgreSQL
+After=postgresql.service
+OnFailure=telegram-attendance-alert@%n.service
+
+[Service]
+Type=oneshot
+User=@SERVICE_USER@
+WorkingDirectory=@PROJECT_DIR@
+ExecStart=@PROJECT_DIR@/deploy/backup.sh
+Nice=10
+IOSchedulingClass=idle

@@ -1,0 +1,9 @@
+[Unit]
+Description=Telegram Attendance - Gửi cảnh báo cho %i
+
+[Service]
+Type=oneshot
+User=@SERVICE_USER@
+WorkingDirectory=@PROJECT_DIR@
+Environment=LOG_TO_FILE=false
+ExecStart=@PROJECT_DIR@/.venv/bin/python main.py alert "⚠️ Tác vụ %i thất bại trên máy %H. Xem log: journalctl -u %i"

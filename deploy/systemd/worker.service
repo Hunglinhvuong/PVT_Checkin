@@ -1,0 +1,22 @@
+[Unit]
+Description=Telegram Attendance - Worker xác minh Timemark (Playwright)
+After=network-online.target postgresql.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+WorkingDirectory=@PROJECT_DIR@
+Environment=PYTHONUNBUFFERED=1
+Environment=LOG_TO_FILE=false
+ExecStart=@PROJECT_DIR@/.venv/bin/python main.py worker
+Restart=always
+RestartSec=15
+# Cho worker thời gian hoàn tất lượt xác minh đang chạy khi dừng dịch vụ
+TimeoutStopSec=120
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

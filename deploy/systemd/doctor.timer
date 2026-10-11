@@ -1,0 +1,10 @@
+[Unit]
+Description=Telegram Attendance - Kiểm tra sức khỏe mỗi 15 phút
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+Unit=telegram-attendance-doctor.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,26 @@
+English
+verify-result
+
+Upload multiple photos to verify their authenticity, metadata, and location using our AI analysis.
+
+Click or drag images to upload
+
+Support multiple image selection. PNG, JPG, GIF up to 10MB
+
+Clear All
+N/A
+Unable to verify
+Unable to verify
+Status: -2300
+Location
+Nghe An
+GPS
+18.691468,105.693124
+Device Model
+Redmi K60
+Software Provider
+Unknown
+Capture Time
+2026-10-10 14:46:42GMT+7
+Photo Code
+LTDX2RRLMD6TRG
