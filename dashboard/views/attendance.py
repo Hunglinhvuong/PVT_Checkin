@@ -14,10 +14,11 @@ STATISTICS_COLUMNS = {
     "full_name": "Nhân viên",
     "working_days": "Số ngày làm việc",
     "work_sessions": "Số buổi làm việc",
-    "on_time": "Số buổi đúng giờ",
-    "punctuality_rate": "Tỷ lệ đúng giờ",
-    "late": "Số buổi muộn",
+    "attended_sessions": "Số buổi điểm danh",
     "missing": "Số buổi không điểm danh",
+    "on_time": "Số buổi đúng giờ",
+    "late": "Số buổi muộn",
+    "punctuality_rate": "Tỷ lệ điểm danh đúng giờ",
 }
 
 
@@ -63,11 +64,11 @@ def render() -> None:
         rows = common.cached(data.attendance_statistics)(d1, d2, tz)
         if rows:
             df = pd.DataFrame(rows).rename(columns=STATISTICS_COLUMNS)
-            df["Tỷ lệ đúng giờ"] = df["Tỷ lệ đúng giờ"].map(
+            df["Tỷ lệ điểm danh đúng giờ"] = df["Tỷ lệ điểm danh đúng giờ"].map(
                 lambda rate: f"{rate:.1%}" if pd.notna(rate) else "—"
             )
             st.dataframe(df, use_container_width=True, hide_index=True)
-            st.caption("Tỷ lệ đúng giờ tính trên các buổi đã xác định đúng giờ hoặc muộn.")
+            st.caption("Tỷ lệ điểm danh đúng giờ tính trên tổng số buổi làm việc.")
         else:
             st.info("Chưa có nhân viên được duyệt trong khoảng ngày đã chọn.")
 

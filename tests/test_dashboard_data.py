@@ -94,19 +94,21 @@ def test_attendance_statistics():
         "full_name": "An",
         "working_days": 1,
         "work_sessions": 2,
-        "on_time": 1,
-        "punctuality_rate": 0.5,
-        "late": 1,
+        "attended_sessions": 2,
         "missing": 0,
+        "on_time": 1,
+        "late": 1,
+        "punctuality_rate": 0.5,
     }
     assert stats["Bình"] == {
         "full_name": "Bình",
         "working_days": 1,
         "work_sessions": 2,
-        "on_time": 0,
-        "punctuality_rate": None,
-        "late": 0,
+        "attended_sessions": 1,
         "missing": 1,
+        "on_time": 0,
+        "late": 0,
+        "punctuality_rate": 0,
     }
 
 

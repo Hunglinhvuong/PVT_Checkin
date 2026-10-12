@@ -156,15 +156,15 @@ def attendance_statistics(d1: date, d2: date, tz: str) -> list[dict]:
         attendance = records_by_user.get(user["id"], {})
         on_time = attendance.get("on_time", 0)
         late = attendance.get("late", 0)
-        evaluated_sessions = on_time + late
         result.append({
             "full_name": user["full_name"],
             "working_days": working_days,
             "work_sessions": expected_sessions,
-            "on_time": on_time,
-            "punctuality_rate": on_time / evaluated_sessions if evaluated_sessions else None,
-            "late": late,
+            "attended_sessions": attendance.get("sessions", 0),
             "missing": max(0, expected_sessions - attendance.get("sessions", 0)),
+            "on_time": on_time,
+            "late": late,
+            "punctuality_rate": on_time / expected_sessions if expected_sessions else None,
         })
     return result
 
