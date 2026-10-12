@@ -80,14 +80,13 @@ Văn phòng: `OFFICE_*` trong `.env` (nạp lần đầu) hoặc `/office set <l
 pip install -r requirements.txt
 python main.py dashboard          # mặc định 0.0.0.0:8501 (DASHBOARD_HOST / DASHBOARD_PORT)
 ```
-- **Xem: không cần đăng nhập** (ai trong mạng cũng thấy tên, ảnh, tọa độ nhân viên; chỉ mở trong LAN/VPN, không public ra Internet).
-- **Sửa: chỉ admin đã đăng ký** (bảng `admins`, vai trò ADMIN/SUPER_ADMIN). Đăng nhập ở thanh bên: nhập Telegram ID, bot gửi mã 6 số
-  qua tin nhắn riêng (hiệu lực 5 phút, tối đa 5 lần nhập sai/mã, 3 yêu cầu/10 phút/ID). Phiên hết hạn sau 8 giờ hoặc khi tải lại trang.
-- Admin phải nhắn `/start` riêng cho bot trước thì mới nhận được mã. SUPER_ADMIN thêm/khóa admin ở trang "Quản trị admin"
-  (admin đầu tiên lấy từ `ADMIN_TELEGRAM_IDS` trong `.env`, tự là SUPER_ADMIN).
-- Mọi thao tác ghi dùng đúng Telegram ID đã xác thực, được audit với nguồn `DASHBOARD`; các service vẫn kiểm tra lại quyền theo bảng `admins`.
+- **Xem: không cần đăng nhập**. Khi đưa lên mạng, mọi người có thể xem tên, ảnh và tọa độ nhân viên; chỉ triển khai công khai nếu bạn chấp nhận việc này.
+- **Sửa: tài khoản/mật khẩu riêng** được cấu hình trong Streamlit Secrets, gắn với Telegram ID admin đang hoạt động (vai trò ADMIN/SUPER_ADMIN). Không dùng BOT_TOKEN, không gọi Telegram API và không gửi thông báo Telegram từ dashboard. Phiên hết hạn sau 8 giờ.
+- SUPER_ADMIN thêm/khóa admin ở trang "Quản trị admin"; để cấp tài khoản dashboard, thêm mục tương ứng vào `dashboard_users` trong Streamlit Secrets. Quyền vẫn được kiểm tra lại theo bảng `admins`, các thao tác được audit với nguồn `DASHBOARD`.
 - Mọi truy vấn xem chạy trong transaction READ ONLY và tham số hóa; dữ liệu lấy trực tiếp từ PostgreSQL (không dùng CSV).
-- Ảnh xem qua URL có chữ ký Cloudinary (loại `authenticated`); máy xem dashboard cần ra được Internet để tải ảnh.
+- Ảnh xem qua URL có chữ ký Cloudinary (loại `authenticated`); máy dashboard cần cấu hình `CLOUDINARY_*` và ra được Internet để tải ảnh.
+
+Có thể cài riêng trên máy khác bằng `sudo ./deploy/install.sh --dashboard-only`; cấu hình `DATABASE_URL` trỏ tới PostgreSQL từ xa và `CLOUDINARY_*` nếu dùng Cloudinary. Schema phải được migrate trước trên máy bot/worker; dashboard không tự chạy migration khi khởi động. Hướng dẫn Streamlit Community Cloud và Supabase: [docs/VAN_HANH.md](docs/VAN_HANH.md).
 
 ## Bổ sung
 - **Thư mục Cloudinary**: đặt `CLOUDINARY_FOLDER` trong `.env` (mặc định `attendance`). Ảnh mới lưu tại `<thư mục>/<YYYY-MM-DD>/<user>_<buổi>_<id>`

@@ -62,7 +62,6 @@ def main(argv: list[str] | None = None) -> int:
 
             return run_worker(s)
         elif args.command == "dashboard":
-            migrate(s.database_url)
             app = Path(__file__).resolve().parent / "dashboard" / "app.py"
             return subprocess.call([
                 sys.executable, "-m", "streamlit", "run", str(app),

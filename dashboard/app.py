@@ -1,5 +1,4 @@
-"""Dashboard quản trị (Streamlit).  Chạy: python main.py dashboard   (hoặc streamlit run dashboard/app.py)
-Xem: không cần đăng nhập.  Sửa: admin đăng nhập bằng mã gửi qua Telegram."""
+"""Dashboard quản trị (Streamlit).  Xem: công khai.  Sửa: tài khoản/mật khẩu riêng."""
 import sys
 from pathlib import Path
 
@@ -10,10 +9,12 @@ import streamlit as st  # noqa: E402
 st.set_page_config(page_title="Điểm danh Telegram", page_icon="🗓️", layout="wide")
 
 from dashboard import auth, common  # noqa: E402
+from dashboard.runtime import apply_streamlit_secrets  # noqa: E402
 from dashboard.views import (  # noqa: E402
     admins_view, attendance, audit_view, calendar_view, employees, overview, photos, verification,
 )
 
+apply_streamlit_secrets(st.secrets)
 common.init_backend()
 auth.sidebar()
 
