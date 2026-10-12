@@ -18,7 +18,10 @@ _pool: ConnectionPool | None = None
 def init_pool(settings: Settings) -> ConnectionPool:
     global _pool
     if not settings.database_url:
-        raise RuntimeError("DATABASE_URL chưa được cấu hình")
+        raise RuntimeError(
+            "DATABASE_URL chưa được cấu hình. Trên Streamlit Community Cloud, thêm "
+            'DATABASE_URL = "postgresql://..." ở cấp cao nhất trong App settings > Secrets.'
+        )
     if _pool is None:
         _pool = ConnectionPool(
             settings.database_url,

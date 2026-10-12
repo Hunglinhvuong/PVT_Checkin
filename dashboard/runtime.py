@@ -8,4 +8,6 @@ from collections.abc import Mapping
 def apply_streamlit_secrets(secrets: Mapping) -> None:
     for name, value in secrets.items():
         if isinstance(value, (str, int, float, bool)):
-            os.environ.setdefault(str(name), str(value))
+            name = str(name)
+            if not os.getenv(name, "").strip():
+                os.environ[name] = str(value)
