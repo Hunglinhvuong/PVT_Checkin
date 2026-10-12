@@ -11,7 +11,7 @@ from config.settings import ConfigError, Settings, load_settings
 from dashboard.util import label
 from database.connection import init_pool
 from repositories import audit
-from services import notifier, photo_storage
+from services import photo_storage
 
 
 @st.cache_resource
@@ -97,11 +97,6 @@ def photo_url(public_id: str | None) -> str | None:
         return photo_storage.signed_url(public_id)
     except Exception:  # noqa: BLE001 - thiếu cấu hình/thư viện Cloudinary
         return None
-
-
-def notify_user(user: dict, text: str) -> None:
-    """Báo kết quả duyệt cho nhân viên (cùng cách bot làm); lỗi gửi không ảnh hưởng thao tác."""
-    notifier.reply(settings().bot_token, user.get("registered_chat_id") or user["telegram_user_id"], None, text)
 
 
 def label_col(df: pd.DataFrame, col: str, mapping: dict[str, str]) -> None:

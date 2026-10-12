@@ -22,6 +22,9 @@ def test_services_run_from_project_dir_with_project_venv():
         assert "User=@SERVICE_USER@" in t and "Restart=always" in t and "StartLimitIntervalSec=0" in t
         assert "Environment=LOG_TO_FILE=false" in t  # nhiều tiến trình không cùng xoay vòng một file log
         assert "/opt/" not in t and "/usr/local/" not in t  # không sao chép mã nguồn đi nơi khác
+    dashboard = (UNITS / "dashboard.service").read_text(encoding="utf-8")
+    assert "After=network-online.target" in dashboard
+    assert "postgresql.service" not in dashboard
 
 
 def test_backup_failure_triggers_alert_and_timer_is_persistent():
@@ -34,6 +37,8 @@ def test_install_script_maps_every_unit_template():
     install = (ROOT / "deploy" / "install.sh").read_text(encoding="utf-8")
     for f in UNITS.iterdir():
         assert f"{f.name}:telegram-attendance-" in install, f.name
+    assert '--dashboard-only' in install
+    assert 'INSTALL_UNITS=("dashboard.service:telegram-attendance-dashboard.service")' in install
 
 
 def test_scripts_are_valid_bash_and_executable():

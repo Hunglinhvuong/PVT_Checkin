@@ -8,3 +8,4 @@ local/photos/
 .pytest_cache/
 venv/
 probe_out/
+.streamlit/secrets.toml

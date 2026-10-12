@@ -24,7 +24,7 @@ def init_pool(settings: Settings) -> ConnectionPool:
             settings.database_url,
             min_size=settings.db_pool_min,
             max_size=settings.db_pool_max,
-            kwargs={"row_factory": dict_row},
+            kwargs={"row_factory": dict_row, "prepare_threshold": None},
             timeout=10,
             open=False,
         )

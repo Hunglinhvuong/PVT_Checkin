@@ -19,9 +19,6 @@ def _decide(admin: int, user: dict, approve: bool) -> None:
     with common.dashboard_source():
         res = registration.decide(admin, user["id"], approve)
     if res.kind == "OK":
-        name = user["full_name"]
-        common.notify_user(user, f"✅ {name} đã được duyệt. Bạn có thể điểm danh." if approve
-                           else f"❌ Đăng ký của {name} bị từ chối. Liên hệ admin nếu cần hỗ trợ.")
         common.done("success", f"Đã {'duyệt' if approve else 'từ chối'} {user['full_name']}.")
     st.error(MSG.get(res.kind, res.kind))
 

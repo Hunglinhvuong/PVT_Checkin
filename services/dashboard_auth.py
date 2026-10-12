@@ -50,6 +50,19 @@ def get_editor(telegram_id: int) -> dict | None:
         return _editor(conn, telegram_id)
 
 
+def record_login(telegram_id: int) -> dict | None:
+    """Ghi nhận đăng nhập bằng tài khoản dashboard nếu admin còn hoạt động."""
+    with get_conn() as conn:
+        admin = _editor(conn, telegram_id)
+        if admin is None:
+            return None
+        audit.add(
+            conn, action="DASHBOARD_LOGIN", entity_type="admins", entity_id=admin["id"],
+            actor_telegram_id=telegram_id, actor_type="DASHBOARD", new_value={"role": admin["role"]},
+        )
+        return admin
+
+
 def issue_code(telegram_user_id: int) -> IssueResult:
     with get_conn() as conn:
         conn.execute("DELETE FROM dashboard_login_codes WHERE created_at < now() - interval '1 day'")

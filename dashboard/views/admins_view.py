@@ -28,8 +28,10 @@ def render() -> None:
     st.dataframe(df.rename(columns={"id": "ID", "telegram_user_id": "Telegram ID", "role": "Vai trò",
                                     "status": "Trạng thái", "created_at": "Tạo lúc"}),
                  use_container_width=True, hide_index=True)
-    st.caption("Admin mới phải nhắn `/start` riêng cho bot trước, nếu không sẽ không nhận được mã đăng nhập. "
-               "VIEWER không có quyền sửa nên không đăng nhập được.")
+    st.caption(
+        "Để admin đăng nhập dashboard, thêm tài khoản vào Streamlit Secrets với telegram_id tương ứng. "
+        "VIEWER không có quyền sửa nên không đăng nhập được."
+    )
 
     with st.form("admin_add"):
         c = st.columns(2)
