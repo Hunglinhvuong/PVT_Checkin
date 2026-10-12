@@ -1,6 +1,7 @@
 """Truy vấn CHỈ ĐỌC cho dashboard (mọi truy vấn chạy trong transaction READ ONLY, tham số hóa). Không phụ thuộc Streamlit."""
 from __future__ import annotations
 
+from bisect import bisect_left
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -104,6 +105,68 @@ def attendance_rows(
         " ORDER BY r.attendance_date DESC, r.session DESC, u.full_name LIMIT %s",
         params,
     )
+
+
+def attendance_statistics(d1: date, d2: date, tz: str) -> list[dict]:
+    """Thống kê các buổi làm việc dự kiến và kết quả điểm danh theo nhân viên."""
+    _, end = _day_bounds(d2, d2, tz)
+    users = _read(
+        "SELECT id, full_name, approved_at FROM users "
+        "WHERE status IN ('APPROVED', 'DISABLED') AND approved_at IS NOT NULL AND approved_at < %s "
+        "ORDER BY full_name",
+        (end,),
+    )
+    if not users:
+        return []
+
+    overrides = {
+        row["holiday_date"]: row
+        for row in _read(
+            "SELECT holiday_date, is_working_day FROM holiday_calendar WHERE holiday_date BETWEEN %s AND %s",
+            (d1, d2),
+        )
+    }
+    working_dates = []
+    day = d1
+    while day <= d2:
+        if is_working_day(day, overrides.get(day)):
+            working_dates.append(day)
+        day += timedelta(days=1)
+
+    user_ids = [user["id"] for user in users]
+    records = []
+    if working_dates:
+        records = _read(
+            "SELECT r.user_id, count(*) AS sessions, "
+            "count(*) FILTER (WHERE r.punctuality_status = 'ON_TIME') AS on_time, "
+            "count(*) FILTER (WHERE r.punctuality_status = 'LATE') AS late "
+            "FROM attendance_records r JOIN users u ON u.id = r.user_id "
+            "WHERE r.user_id = ANY(%s) AND r.attendance_date = ANY(%s) "
+            "AND r.attendance_date >= (u.approved_at AT TIME ZONE %s)::date "
+            "AND r.superseded_at IS NULL GROUP BY r.user_id",
+            (user_ids, working_dates, tz),
+        )
+    records_by_user = {row["user_id"]: row for row in records}
+    result = []
+    for user in users:
+        approved_date = user["approved_at"].astimezone(ZoneInfo(tz)).date()
+        first_day = max(d1, approved_date)
+        working_days = len(working_dates) - bisect_left(working_dates, first_day)
+        expected_sessions = working_days * len(SESSIONS)
+        attendance = records_by_user.get(user["id"], {})
+        on_time = attendance.get("on_time", 0)
+        late = attendance.get("late", 0)
+        evaluated_sessions = on_time + late
+        result.append({
+            "full_name": user["full_name"],
+            "working_days": working_days,
+            "work_sessions": expected_sessions,
+            "on_time": on_time,
+            "punctuality_rate": on_time / evaluated_sessions if evaluated_sessions else None,
+            "late": late,
+            "missing": max(0, expected_sessions - attendance.get("sessions", 0)),
+        })
+    return result
 
 
 # ---------------------------------------------------------------- xác minh ảnh

@@ -10,13 +10,23 @@ COLUMNS = {
     "verification_status": "Xác minh", "punctuality_status": "Giờ giấc", "final_status": "Kết quả", "flags": "Cờ",
 }
 
+STATISTICS_COLUMNS = {
+    "full_name": "Nhân viên",
+    "working_days": "Số ngày làm việc",
+    "work_sessions": "Số buổi làm việc",
+    "on_time": "Số buổi đúng giờ",
+    "punctuality_rate": "Tỷ lệ đúng giờ",
+    "late": "Số buổi muộn",
+    "missing": "Số buổi không điểm danh",
+}
+
 
 def render() -> None:
     common.show_flash()
     st.title("✅ Điểm danh")
     tz = common.tz()
     today = data.local_today(tz)
-    tab_list, tab_missing = st.tabs(["Danh sách", "Thiếu điểm danh"])
+    tab_list, tab_missing, tab_statistics = st.tabs(["Danh sách", "Thiếu điểm danh", "Thống kê"])
 
     with tab_list:
         users = common.cached(data.users_basic)()
@@ -43,6 +53,23 @@ def render() -> None:
             st.dataframe(df, use_container_width=True, hide_index=True)
             st.download_button("⬇️ Tải CSV", df.to_csv(index=False).encode("utf-8-sig"),
                                file_name=f"diem-danh_{d1:%Y%m%d}_{d2:%Y%m%d}.csv", mime="text/csv")
+
+    with tab_statistics:
+        month_start = today.replace(day=1)
+        selected_range = st.date_input(
+            "Khoảng ngày thống kê", value=(month_start, today), format="DD/MM/YYYY", key="statistics_date_range"
+        )
+        d1, d2 = normalize_range(selected_range, today)
+        rows = common.cached(data.attendance_statistics)(d1, d2, tz)
+        if rows:
+            df = pd.DataFrame(rows).rename(columns=STATISTICS_COLUMNS)
+            df["Tỷ lệ đúng giờ"] = df["Tỷ lệ đúng giờ"].map(
+                lambda rate: f"{rate:.1%}" if pd.notna(rate) else "—"
+            )
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.caption("Tỷ lệ đúng giờ tính trên các buổi đã xác định đúng giờ hoặc muộn.")
+        else:
+            st.info("Chưa có nhân viên được duyệt trong khoảng ngày đã chọn.")
 
     with tab_missing:
         c = st.columns(2)

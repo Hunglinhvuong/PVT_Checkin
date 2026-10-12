@@ -86,6 +86,30 @@ def test_attendance_filters():
     assert len(data.attendance_rows(D, D, user_ids=(uid,))) == 1
 
 
+def test_attendance_statistics():
+    rows = data.attendance_statistics(D, D, TZ)
+    stats = {row["full_name"]: row for row in rows}
+    assert set(stats) == {"An", "Bình"}
+    assert stats["An"] == {
+        "full_name": "An",
+        "working_days": 1,
+        "work_sessions": 2,
+        "on_time": 1,
+        "punctuality_rate": 0.5,
+        "late": 1,
+        "missing": 0,
+    }
+    assert stats["Bình"] == {
+        "full_name": "Bình",
+        "working_days": 1,
+        "work_sessions": 2,
+        "on_time": 0,
+        "punctuality_rate": None,
+        "late": 0,
+        "missing": 1,
+    }
+
+
 def test_daily_series_and_queue():
     s = data.daily_series(D, 14)
     assert {(r["attendance_date"], r["final_status"]): r["n"] for r in s}[(D, "VALID")] == 1
