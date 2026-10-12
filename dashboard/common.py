@@ -14,7 +14,6 @@ from repositories import audit
 from services import photo_storage
 
 
-@st.cache_resource
 def settings() -> Settings:
     return load_settings()
 
