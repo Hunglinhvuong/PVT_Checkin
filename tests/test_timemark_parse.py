@@ -1,5 +1,4 @@
-"""Test phân tích kết quả. SAMPLE_AUTHENTIC dựng theo ảnh chụp màn hình thật (ca Authentic).
-Các mẫu Fake / Not Found / Unable là TỔNG HỢP theo tên trạng thái trong spec, chưa phải giao diện quan sát thật."""
+"""Test phân tích giao diện cũ và mới. Các mẫu Fake / Not Found tổng hợp chưa phải giao diện quan sát thật."""
 from datetime import timedelta
 
 import pytest
@@ -87,6 +86,9 @@ def test_gps(raw, state):
 def test_capture_time_variants():
     assert parse_capture_time("2026-10-10 08:11:53 GMT+05:30").utcoffset() == timedelta(hours=5, minutes=30)
     assert parse_capture_time("2026-10-10 08:11:53 GMT-8").utcoffset() == timedelta(hours=-8)
+    human = parse_capture_time("Oct 10, 2026, 2:46:21 PM\nGMT+7")
+    assert (human.hour, human.minute, human.second) == (14, 46, 21)
+    assert human.utcoffset() == timedelta(hours=7)
     assert parse_capture_time("2026-13-40 08:11:53 GMT+7") is None
     assert parse_capture_time("không phải thời gian") is None
     assert parse_capture_time(None) is None
@@ -115,6 +117,33 @@ def test_real_edited_photo_2300():
     assert (r.gps_state, r.latitude, r.longitude) == ("OK", 18.691468, 105.693124)
     ct = r.capture_time  # "14:46:42GMT+7" (không có khoảng trắng trước GMT)
     assert (ct.hour, ct.minute, ct.second) == (14, 46, 42) and ct.utcoffset() == timedelta(hours=7)
+
+
+def test_current_timemark_gallery_result_layout():
+    r = parse_result((FIX / "page_text_gallery_edited_2300.txt").read_text(encoding="utf-8"))
+    assert (r.status, r.reason, r.status_code) == ("VERIFIED_FAKE", "EDITED", -2300)
+    assert r.fields["Photo Code"] is None
+    assert "Code -2300" in r.result_text
+
+
+def test_current_timemark_gallery_authentic_extracts_record_fields():
+    r = parse_result((FIX / "page_text_gallery_authentic.txt").read_text(encoding="utf-8"))
+    assert (r.status, r.reason, r.status_code) == ("VERIFIED_AUTHENTIC", None, None)
+    assert r.capture_time.strftime("%Y-%m-%d %H:%M:%S%z") == "2026-10-10 14:46:21+0700"
+    assert r.photo_code == "2UA99D49BL3HUN"
+    assert (r.gps_state, r.latitude, r.longitude) == ("OK", 18.691468, 105.693124)
+    assert r.fields["Device Model"] == "Redmi K60"
+
+
+def test_current_timemark_gallery_still_checking_is_pending():
+    text = "Photos1\nAdd\nAll\n1\n1 / 1\nChecking…\n"
+    assert parse_result(text) is None
+
+
+def test_current_timemark_gallery_conflicting_statuses_are_rejected():
+    text = "Photos1\nAll\n1\n1 / 1\nAuthentic\nFake\nCode -9999\n"
+    with pytest.raises(UiChangedError):
+        parse_result(text)
 
 
 def test_unknown_unable_code_is_not_guessed():

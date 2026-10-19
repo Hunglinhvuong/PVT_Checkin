@@ -30,6 +30,8 @@ def main() -> int:
     ) as v:
         o = v.verify(args[0], tag="probe", debug_dir=out)
     print("status      :", o.status, f"({o.status_text})")
+    print("status code :", o.status_code)
+    print("reason      :", o.reason)
     print("error       :", o.error)
     print("fields      :", o.fields)
     print("capture_time:", o.capture_time)

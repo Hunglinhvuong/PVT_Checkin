@@ -2,15 +2,14 @@
 
 Nguyên tắc:
 - KHÔNG vượt CAPTCHA/chặn bot, KHÔNG gọi API nội bộ: chỉ thao tác như người dùng (upload ảnh, đọc kết quả hiển thị).
-- Không dựa vào class CSS (dễ đổi): đọc văn bản hiển thị (innerText) của khu vực kết quả, bắt đầu sau mốc "Clear All".
+- Không dựa vào class CSS (dễ đổi): đọc văn bản hiển thị (innerText) của kết quả, hỗ trợ cả giao diện cũ và mới.
 - Không đoán: không đọc được trạng thái rõ ràng => AUTOMATION_ERROR, không bao giờ coi là Authentic.
 - Có thể thay bằng API chính thức: chỉ cần một lớp khác cài đặt Verifier.verify().
 
-Đã quan sát thực tế (ảnh chụp màn hình): trạng thái "Authentic"; các nhãn Location, GPS, Device Model,
-Software Provider, Capture Time, Photo Code; trang hỗ trợ PNG/JPG/GIF tối đa 10MB.
-Đã quan sát thêm: "Unable to verify" kèm "Status: -2307" (server Timemark chưa nhận dữ liệu ảnh, thử lại sau) và
-"Status: -2300" (ảnh đã bị chỉnh sửa), "Status: -2301" (ảnh không có code hợp lệ; mô tả của người dùng, chưa có mẫu trang thật). CHƯA quan sát: Fake / Not Found thật (đang theo tên trạng thái trong spec);
-mã Status lạ => UNABLE_TO_VERIFY, chuyển admin, không đoán.
+Đã quan sát giao diện cũ với các nhãn Location, GPS, Device Model, Software Provider, Capture Time và Photo Code;
+giao diện mới hiển thị trạng thái trong gallery, mã "Code -2300" và các nhãn Taken, Location, Photo Code, Device.
+"Unable to verify" kèm mã -2307 nghĩa là server chưa nhận dữ liệu ảnh; -2300 là ảnh bị chỉnh sửa.
+Mã -2301 chưa có mẫu giao diện thật; mã lạ => UNABLE_TO_VERIFY, chuyển admin, không đoán.
 """
 from __future__ import annotations
 
@@ -32,11 +31,13 @@ STATUS_BY_TEXT = {
     "not found": "VERIFIED_NOT_FOUND",
     "unable to verify": "UNABLE_TO_VERIFY",
 }
-_CODE_STATUS_RE = re.compile(r"Status:\s*(-?\d+)", re.I)
+_CODE_STATUS_RE = re.compile(r"^\s*(?:Status|Code)\s*:?\s*(-?\d+)\b", re.I | re.M)
 PENDING_UPLOAD_CODES = {-2307}  # Timemark chưa nhận dữ liệu ảnh => thử lại sau
 EDITED_CODES = {-2300}  # ảnh đã bị chỉnh sửa
 NO_CODE_CODES = {-2301}  # ảnh không có code hợp lệ => nhân viên cần gửi ảnh khác
 _STATUS_RE = re.compile(r"\b(authentic|fake|not found|unable to verify)\b", re.I)  # \b: "authenticity" không khớp
+_PHOTO_GALLERY_RE = re.compile(r"\bPhotos\s*\d+\b", re.I)
+_PHOTO_POSITION_RE = re.compile(r"\b\d+\s*/\s*\d+\b")
 _BLOCK_RE = re.compile(
     r"captcha|verify you are human|are you a robot|just a moment|access denied|too many requests|"
     r"rate limit|unusual traffic",
@@ -44,15 +45,26 @@ _BLOCK_RE = re.compile(
 )
 _WAIT_JS = r"""() => {
   const t = document.body ? document.body.innerText : '';
+  const status = /\b(authentic|fake|not found|unable to verify)\b/i;
   const i = t.indexOf('__MARKER__');
-  if (i < 0) return false;
-  return /\b(authentic|fake|not found|unable to verify)\b/i.test(t.slice(i));
+  if (i >= 0 && status.test(t.slice(i))) return true;
+  const gallery = /\bPhotos\s*\d+\b/i.exec(t);
+  if (!gallery) return false;
+  const afterGallery = t.slice(gallery.index + gallery[0].length);
+  const position = /\b\d+\s*\/\s*\d+\b/.exec(afterGallery);
+  if (!position) return false;
+  return status.test(afterGallery.slice(position.index + position[0].length));
 }""".replace("__MARKER__", RESULT_MARKER)
 
 _NO_GPS = {"", "no data", "unknown", "n/a", "na", "-", "--", "none", "null"}
 _GPS_RE = re.compile(r"^\s*(-?\d{1,3}(?:\.\d+)?)\s*[,;/ ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$")
 _TIME_RE = re.compile(
     r"(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})\s*(?:GMT|UTC)?\s*([+-])(\d{1,2})(?::?(\d{2}))?"
+)
+_HUMAN_TIME_RE = re.compile(
+    r"([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?"
+    r"\s*(AM|PM)?\s*(?:GMT|UTC)\s*([+-])\s*(\d{1,2})(?::?(\d{2}))?",
+    re.I,
 )
 _CODE_RE = re.compile(r"^[A-Za-z0-9]{6,32}$")
 
@@ -79,7 +91,7 @@ class VerificationOutcome:
     screenshot: str | None = None
     error: str | None = None
     blocked: bool = False
-    status_code: int | None = None  # mã "Status: -23xx" của trang (nếu có)
+    status_code: int | None = None  # mã "Status: -23xx" hoặc "Code -23xx" của trang
     reason: str | None = None  # PENDING_UPLOAD | EDITED | NO_VALID_CODE | UNKNOWN_CODE | None
 
 
@@ -107,11 +119,27 @@ def parse_capture_time(raw: str | None) -> datetime | None:
     if not raw:
         return None
     m = _TIME_RE.search(raw)
-    if not m:
-        return None
-    y, mo, d, h, mi, s = (int(m.group(i)) for i in range(1, 7))
-    sign = 1 if m.group(7) == "+" else -1
-    off = timedelta(hours=int(m.group(8)), minutes=int(m.group(9) or 0))
+    if m:
+        y, mo, d, h, mi, s = (int(m.group(i)) for i in range(1, 7))
+        sign = 1 if m.group(7) == "+" else -1
+        off = timedelta(hours=int(m.group(8)), minutes=int(m.group(9) or 0))
+    else:
+        m = _HUMAN_TIME_RE.search(raw)
+        if not m:
+            return None
+        try:
+            mo = datetime.strptime(m.group(1).title(), "%b").month
+        except ValueError:
+            return None
+        d, y, h, mi = (int(m.group(i)) for i in (2, 3, 4, 5))
+        s = int(m.group(6) or 0)
+        meridian = (m.group(7) or "").upper()
+        if meridian:
+            if not 1 <= h <= 12:
+                return None
+            h = h % 12 + (12 if meridian == "PM" else 0)
+        sign = 1 if m.group(8) == "+" else -1
+        off = timedelta(hours=int(m.group(9)), minutes=int(m.group(10) or 0))
     try:
         return datetime(y, mo, d, h, mi, s, tzinfo=timezone(sign * off))
     except ValueError:
@@ -145,17 +173,38 @@ def classify_status(word: str, code: int | None) -> tuple[str, str | None]:
 
 
 def parse_result(text: str) -> ParsedResult | None:
-    """None: kết quả chưa hiện. UiChangedError: không có mốc kết quả hoặc nhiều trạng thái mâu thuẫn."""
+    """None: kết quả chưa hiện. UiChangedError: không nhận diện được giao diện hoặc trạng thái mâu thuẫn."""
     idx = text.find(RESULT_MARKER)
-    if idx < 0:
-        raise UiChangedError(f"Không thấy mốc '{RESULT_MARKER}' trong trang")
-    region = text[idx + len(RESULT_MARKER):]
-    found = {m.group(1).lower() for m in _STATUS_RE.finditer(region)}
-    if not found:
-        return None
-    if len(found) > 1:
-        raise UiChangedError(f"Nhiều trạng thái mâu thuẫn: {sorted(found)}")
-    word = found.pop()
+    gallery_layout = idx < 0
+    if idx >= 0:
+        region = text[idx + len(RESULT_MARKER):]
+        matches = list(_STATUS_RE.finditer(region))
+        found = {m.group(1).lower() for m in matches}
+        if not found:
+            return None
+        if len(found) > 1:
+            raise UiChangedError(f"Nhiều trạng thái mâu thuẫn: {sorted(found)}")
+        word = found.pop()
+    else:
+        gallery = _PHOTO_GALLERY_RE.search(text)
+        if not gallery:
+            raise UiChangedError(f"Không thấy mốc '{RESULT_MARKER}' hoặc danh sách ảnh")
+        after_gallery = text[gallery.end():]
+        position = _PHOTO_POSITION_RE.search(after_gallery)
+        if not position:
+            return None
+        region = after_gallery[position.end():]
+        code_marker = _CODE_STATUS_RE.search(region)
+        status_region = region[:code_marker.start()] if code_marker else region
+        matches = list(_STATUS_RE.finditer(status_region))
+        if not matches:
+            return None
+        found = {m.group(1).lower() for m in matches}
+        if len(found) > 1:
+            raise UiChangedError(f"Nhiều trạng thái mâu thuẫn: {sorted(found)}")
+        word = matches[-1].group(1).lower()
+        region = region[matches[-1].start():]
+
     m_code = _CODE_STATUS_RE.search(region)
     status_code = int(m_code.group(1)) if m_code else None
     status, reason = classify_status(word, status_code)
@@ -171,6 +220,37 @@ def parse_result(text: str) -> ParsedResult | None:
             if i + 1 < len(lines) and lines[i + 1].lower() not in low_labels:
                 value = lines[i + 1]
         fields[label] = value
+
+    if gallery_layout:
+        taken = [i for i, ln in enumerate(lines) if ln.lower() == "taken"]
+        if taken:
+            start = taken[-1] + 1
+            end = next(
+                (i for i in range(start, len(lines)) if lines[i].lower() in {"location", "photo code", "device", "file"}),
+                len(lines),
+            )
+            fields["Capture Time"] = "\n".join(lines[start:end]) or None
+
+        locations = [i for i, ln in enumerate(lines) if ln.lower() == "location"]
+        if locations:
+            start = locations[-1] + 1
+            end = next(
+                (i for i in range(start, len(lines)) if lines[i].lower() in {"photo code", "device", "file"}),
+                len(lines),
+            )
+            for value in lines[start:end]:
+                gps_state, _, _ = parse_gps(value)
+                if gps_state == "OK":
+                    fields["GPS"] = value
+                    break
+                if fields["Location"] is None:
+                    fields["Location"] = value
+
+        devices = [i for i, ln in enumerate(lines) if ln.lower() == "device"]
+        if devices:
+            i = devices[-1]
+            if i + 1 < len(lines) and lines[i + 1].lower() not in {"file", "photo code"}:
+                fields["Device Model"] = lines[i + 1]
 
     code = fields["Photo Code"]
     gps_state, lat, lon = parse_gps(fields["GPS"])

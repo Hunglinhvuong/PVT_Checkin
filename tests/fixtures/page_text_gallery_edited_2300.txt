@@ -1,0 +1,27 @@
+Timemark
+Verify
+API & MCP
+Photo Code
+English
+Photos1
+Add
+All
+1
+Authentic
+0
+Fake
+0
+Unable to Verify
+1
+real.jpg
+Unable to Verify
+1 / 1
+Unable to Verify
+
+Code -2300
+File
+real.jpg
+306 KB
+Want photos that can’t be faked?
+
+In Teamspace, turn on “Timemark capture only”. Only photos taken in the Timemark camera can enter your team.

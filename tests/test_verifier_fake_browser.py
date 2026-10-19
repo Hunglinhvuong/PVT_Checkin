@@ -117,6 +117,22 @@ def test_real_pending_and_edited_pages_keep_screenshot_for_diagnosis():
     assert (out.status, out.reason) == ("VERIFIED_FAKE", "EDITED") and Path(out.screenshot).exists()
 
 
+def test_current_gallery_result_layout_is_parsed():
+    text = (FIX / "page_text_gallery_edited_2300.txt").read_text(encoding="utf-8")
+    out = _run(FakePage(text))
+    assert (out.status, out.reason, out.status_code) == ("VERIFIED_FAKE", "EDITED", -2300)
+
+
+def test_current_gallery_authentic_result_keeps_capture_metadata():
+    text = (FIX / "page_text_gallery_authentic.txt").read_text(encoding="utf-8")
+    out = _run(FakePage(text))
+    assert out.status == "VERIFIED_AUTHENTIC"
+    assert out.capture_time.strftime("%Y-%m-%d %H:%M:%S%z") == "2026-10-10 14:46:21+0700"
+    assert out.photo_code == "2UA99D49BL3HUN"
+    assert (out.gps_state, out.latitude, out.longitude) == ("OK", 18.691468, 105.693124)
+    assert out.fields["Device Model"] == "Redmi K60"
+
+
 def test_timeout_waiting_for_result_is_automation_error():
     out = _run(FakePage(HEADER, wait_timeout=True))
     assert out.status == "AUTOMATION_ERROR" and out.error.startswith("TIMEOUT") and not out.blocked
