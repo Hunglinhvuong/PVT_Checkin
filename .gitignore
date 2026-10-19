@@ -9,3 +9,4 @@ local/photos/
 venv/
 probe_out/
 .streamlit/secrets.toml
+tests/
