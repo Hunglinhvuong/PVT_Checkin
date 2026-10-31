@@ -13,10 +13,10 @@ from datetime import date, datetime, time, timedelta
 from services.geo import haversine_km
 from services.workcalendar import AFTERNOON, MORNING, session_for, to_local
 
-DEADLINE_MORNING_NEAR = time(7, 50)  # không có tọa độ hoặc ≤ 10 km
+DEADLINE_MORNING_NEAR = time(7, 41)  # không có tọa độ hoặc ≤ 10 km
 DEADLINE_MORNING_MID = time(10, 0)  # > 10 km và ≤ 40 km
 DEADLINE_MORNING_FAR = time(11, 30)  # > 40 km
-DEADLINE_AFTERNOON = time(13, 50)  # không phụ thuộc khoảng cách
+DEADLINE_AFTERNOON = time(13, 41)  # không phụ thuộc khoảng cách
 NEAR_KM = 10.0
 MID_KM = 40.0
 CLOCK_SKEW_TOLERANCE = timedelta(minutes=5)  # ảnh "chụp sau khi nhận" quá mức này là bất thường
