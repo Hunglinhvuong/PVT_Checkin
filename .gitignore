@@ -10,3 +10,4 @@ venv/
 probe_out/
 .streamlit/secrets.toml
 tests/
+/backups/

@@ -4,9 +4,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import random
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
 
-from telegram import Update
-from telegram.error import TelegramError
+from telegram import Document, PhotoSize, Update
+from telegram.error import BadRequest, NetworkError, TelegramError
 from telegram.ext import ContextTypes
 
 from services import attendance, photo_storage
@@ -15,6 +18,11 @@ from services.workcalendar import SESSION_LABEL
 log = logging.getLogger(__name__)
 MAX_BYTES = 10 * 1024 * 1024  # trang verify.timemark.com chỉ nhận tối đa 10 MB
 ALLOWED_EXT = {"jpg", "png"}  # trang chỉ hỗ trợ PNG/JPG/GIF; không chuyển đổi vì sẽ làm đổi ảnh gốc
+MAX_DOWNLOAD_ATTEMPTS = 3
+RETRY_BASE_DELAY_SECONDS = 0.5
+GET_FILE_TIMEOUTS = {"read_timeout": 15, "connect_timeout": 10, "pool_timeout": 10}
+DOWNLOAD_TIMEOUTS = {"read_timeout": 45, "connect_timeout": 10, "pool_timeout": 10}
+_T = TypeVar("_T")
 
 
 def _reject_text(el: attendance.Eligibility | attendance.IntakeResult) -> str:
@@ -36,6 +44,53 @@ def _reject_text(el: attendance.Eligibility | attendance.IntakeResult) -> str:
     if k == "ATTEMPTS_EXCEEDED":
         return "⛔ Bạn đã gửi quá số lần cho phép trong buổi này. Vui lòng liên hệ admin."
     return "Không xử lý được ảnh này."
+
+
+async def _retry_telegram_operation(
+    stage: str, operation: Callable[[], Awaitable[_T]], file_size: int | None
+) -> _T:
+    for attempt in range(1, MAX_DOWNLOAD_ATTEMPTS + 1):
+        try:
+            result = await operation()
+            if attempt > 1:
+                log.info(
+                    "Tải ảnh Telegram thành công sau retry: stage=%s retries=%d size_bytes=%s",
+                    stage, attempt - 1, file_size,
+                )
+            return result
+        except TelegramError as exc:
+            network_error = isinstance(exc, NetworkError) and not isinstance(exc, BadRequest)
+            retryable = network_error and attempt < MAX_DOWNLOAD_ATTEMPTS
+            if not retryable:
+                log.warning(
+                    "Thao tác ảnh Telegram thất bại: stage=%s attempt=%d/%d size_bytes=%s "
+                    "error_type=%s network_error=%s",
+                    stage, attempt, MAX_DOWNLOAD_ATTEMPTS, file_size, type(exc).__name__,
+                    network_error,
+                )
+                raise
+            delay = RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1)) + random.uniform(0, 0.25)
+            log.warning(
+                "Lỗi mạng Telegram khi xử lý ảnh, sẽ retry: stage=%s attempt=%d/%d "
+                "size_bytes=%s error_type=%s retry_in=%.2fs",
+                stage, attempt, MAX_DOWNLOAD_ATTEMPTS, file_size, type(exc).__name__, delay,
+            )
+            await asyncio.sleep(delay)
+    raise RuntimeError("Hết lượt thử tải ảnh Telegram")
+
+
+async def _download_photo(tg_obj: PhotoSize | Document) -> bytes:
+    tg_file = await _retry_telegram_operation(
+        "get_file",
+        lambda: tg_obj.get_file(**GET_FILE_TIMEOUTS),
+        tg_obj.file_size,
+    )
+    data = await _retry_telegram_operation(
+        "download",
+        lambda: tg_file.download_as_bytearray(**DOWNLOAD_TIMEOUTS),
+        tg_obj.file_size,
+    )
+    return bytes(data)
 
 
 async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -62,11 +117,15 @@ async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await msg.reply_text("Ảnh quá lớn (tối đa 10 MB).")
         return
     try:
-        tg_file = await tg_obj.get_file()
-        data = bytes(await tg_file.download_as_bytearray())
-    except TelegramError as exc:
-        log.warning("Không tải được ảnh từ Telegram: %s", exc)
-        await msg.reply_text("Không tải được ảnh, vui lòng gửi lại.")
+        data = await _download_photo(tg_obj)
+    except TelegramError:
+        try:
+            await msg.reply_text("Không tải được ảnh, vui lòng gửi lại.")
+        except TelegramError as reply_exc:
+            log.warning(
+                "Không gửi được thông báo lỗi tải ảnh: error_type=%s",
+                type(reply_exc).__name__,
+            )
         return
 
     ext = photo_storage.detect_image_ext(data)

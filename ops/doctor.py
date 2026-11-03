@@ -160,20 +160,16 @@ def check_services() -> list[Check]:
     return out or [Check("Dịch vụ systemd", OK, "chưa cài (chạy tay)")]
 
 
-def _http(url: str, timeout: int = 10, proxy_url: str | None = None) -> bytes:
+def _http(url: str, timeout: int = 10) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "attendance-doctor/1.0"})
-    opener = (
-        urllib.request.build_opener(urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url}))
-        if proxy_url
-        else urllib.request
-    )
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     with opener.urlopen(req, timeout=timeout) as r:
         return r.read(200_000)
 
 
 def check_telegram(s: Settings) -> Check:
     try:
-        data = json.loads(_http(f"https://api.telegram.org/bot{s.bot_token}/getMe", proxy_url=s.telegram_proxy or None))
+        data = json.loads(_http(f"https://api.telegram.org/bot{s.bot_token}/getMe"))
     except urllib.error.HTTPError as exc:
         return Check("Telegram", FAIL, f"HTTP {exc.code} (BOT_TOKEN sai?)")
     except Exception as exc:  # noqa: BLE001 - không đưa URL (chứa token) vào thông báo

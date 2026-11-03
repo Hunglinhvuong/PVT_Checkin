@@ -5,6 +5,7 @@ import logging
 
 from telegram import Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.request import HTTPXRequest
 
 from bot.handlers import admin as admin_h
 from bot.handlers import attendance as att_h
@@ -42,11 +43,30 @@ def run_bot(settings: Settings) -> None:
         Application.builder()
         .token(settings.bot_token)
         .concurrent_updates(8)
+        .request(
+            HTTPXRequest(
+                connection_pool_size=16,
+                read_timeout=20,
+                write_timeout=20,
+                connect_timeout=10,
+                pool_timeout=10,
+                media_write_timeout=45,
+                httpx_kwargs={"trust_env": False},
+            )
+        )
+        .get_updates_request(
+            HTTPXRequest(
+                connection_pool_size=4,
+                read_timeout=15,
+                write_timeout=20,
+                connect_timeout=10,
+                pool_timeout=10,
+                httpx_kwargs={"trust_env": False},
+            )
+        )
         .post_init(post_init)
         .post_shutdown(post_shutdown)
     )
-    if settings.telegram_proxy:
-        builder = builder.proxy(settings.telegram_proxy).get_updates_proxy(settings.telegram_proxy)
     app = builder.build()
     app.bot_data["settings"] = settings
 
